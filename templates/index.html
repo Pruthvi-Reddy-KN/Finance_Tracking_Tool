@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-wallet"></i> Personal Finance Tracker</h1>
+            <div class="balance-display">
+                <h2>Current Balance: <span id="current-balance">${{ "%.2f"|format(balance) }}</span></h2>
+            </div>
+        </header>
+
+        <div class="dashboard">
+            <!-- Quick Actions -->
+            <div class="card">
+                <h3><i class="fas fa-plus-circle"></i> Quick Actions</h3>
+                <div class="quick-actions">
+                    <button class="btn btn-income" onclick="showModal('income-modal')">
+                        <i class="fas fa-arrow-up"></i> Add Income
+                    </button>
+                    <button class="btn btn-expense" onclick="showModal('expense-modal')">
+                        <i class="fas fa-arrow-down"></i> Add Expense
+                    </button>
+                    <button class="btn btn-budget" onclick="showModal('budget-modal')">
+                        <i class="fas fa-chart-pie"></i> Set Budget
+                    </button>
+                </div>
+            </div>
+
+            <!-- Monthly Summary -->
+            <div class="card">
+                <h3><i class="fas fa-calendar-alt"></i> This Month</h3>
+                <div class="monthly-stats">
+                    <div class="stat">
+                        <span class="stat-label">Income</span>
+                        <span class="stat-value income">${{ "%.2f"|format(monthly_summary.total_income) }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Expenses</span>
+                        <span class="stat-value expense">${{ "%.2f"|format(monthly_summary.total_expenses) }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Net</span>
+                        <span class="stat-value {{ 'income' if monthly_summary.net_income >= 0 else 'expense' }}">
+                            ${{ "%.2f"|format(monthly_summary.net_income) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Budget Status -->
+            <div class="card">
+                <h3><i class="fas fa-chart-bar"></i> Budget Status</h3>
+                <div id="budget-status">
+                    {% if budget_status %}
+                        {% for category, status in budget_status.items() %}
+                        <div class="budget-item">
+                            <div class="budget-header">
+                                <span class="category">{{ category }}</span>
+                                <span class="amount">${{ "%.2f"|format(status.current_spent) }} / ${{ "%.2f"|format(status.monthly_limit) }}</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill {{ 'over-budget' if status.over_budget else '' }}" 
+                                     style="width: {{ [status.percentage, 100]|min }}%"></div>
+                            </div>
+                            <div class="budget-info">
+                                <span class="percentage">{{ "%.1f"|format(status.percentage) }}%</span>
+                                <span class="remaining {{ 'over-budget' if status.over_budget else '' }}">
+                                    {{ 'Over by' if status.over_budget else 'Remaining' }}: ${{ "%.2f"|format(status.remaining|abs) }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-data">No budgets set. Click "Set Budget" to get started!</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="card">
+                <h3><i class="fas fa-history"></i> Recent Transactions</h3>
+                <div id="recent-transactions">
+                    {% if recent_transactions %}
+                        {% for transaction in recent_transactions %}
+                        <div class="transaction-item" data-id="{{ transaction.id }}">
+                            <div class="transaction-info">
+                                <div class="transaction-header">
+                                    <span class="category">{{ transaction.category }}</span>
+                                    <span class="amount {{ transaction.transaction_type }}">
+                                        {{ '+' if transaction.transaction_type == 'income' else '-' }}${{ "%.2f"|format(transaction.amount) }}
+                                    </span>
+                                </div>
+                                <div class="transaction-details">
+                                    <span class="description">{{ transaction.description or 'No description' }}</span>
+                                    <span class="date">{{ transaction.date }}</span>
+                                </div>
+                            </div>
+                            <button class="delete-btn" onclick="deleteTransaction('{{ transaction.id }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-data">No transactions yet. Add your first transaction!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Income Modal -->
+    <div id="income-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-up"></i> Add Income</h3>
+                <span class="close" onclick="hideModal('income-modal')">&times;</span>
+            </div>
+            <form id="income-form">
+                <div class="form-group">
+                    <label for="income-amount">Amount ($)</label>
+                    <input type="number" id="income-amount" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="income-category">Category</label>
+                    <input type="text" id="income-category" value="Salary" required>
+                </div>
+                <div class="form-group">
+                    <label for="income-description">Description</label>
+                    <input type="text" id="income-description">
+                </div>
+                <div class="form-group">
+                    <label for="income-date">Date</label>
+                    <input type="date" id="income-date">
+                </div>
+                <button type="submit" class="btn btn-income">Add Income</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div id="expense-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-down"></i> Add Expense</h3>
+                <span class="close" onclick="hideModal('expense-modal')">&times;</span>
+            </div>
+            <form id="expense-form">
+                <div class="form-group">
+                    <label for="expense-amount">Amount ($)</label>
+                    <input type="number" id="expense-amount" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="expense-category">Category</label>
+                    <select id="expense-category" required>
+                        <option value="">Select Category</option>
+                        <option value="Food">Food</option>
+                        <option value="Transportation">Transportation</option>
+                        <option value="Entertainment">Entertainment</option>
+                        <option value="Utilities">Utilities</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="expense-category-custom">Or enter custom category</label>
+                    <input type="text" id="expense-category-custom" placeholder="Custom category">
+                </div>
+                <div class="form-group">
+                    <label for="expense-description">Description</label>
+                    <input type="text" id="expense-description">
+                </div>
+                <div class="form-group">
+                    <label for="expense-date">Date</label>
+                    <input type="date" id="expense-date">
+                </div>
+                <button type="submit" class="btn btn-expense">Add Expense</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Set Budget Modal -->
+    <div id="budget-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-chart-pie"></i> Set Budget</h3>
+                <span class="close" onclick="hideModal('budget-modal')">&times;</span>
+            </div>
+            <form id="budget-form">
+                <div class="form-group">
+                    <label for="budget-category">Category</label>
+                    <select id="budget-category" required>
+                        <option value="">Select Category</option>
+                        <option value="Food">Food</option>
+                        <option value="Transportation">Transportation</option>
+                        <option value="Entertainment">Entertainment</option>
+                        <option value="Utilities">Utilities</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="budget-category-custom">Or enter custom category</label>
+                    <input type="text" id="budget-category-custom" placeholder="Custom category">
+                </div>
+                <div class="form-group">
+                    <label for="budget-limit">Monthly Budget Limit ($)</label>
+                    <input type="number" id="budget-limit" step="0.01" required>
+                </div>
+                <button type="submit" class="btn btn-budget">Set Budget</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification hidden">
+        <span id="notification-message"></span>
+        <button onclick="hideNotification()">&times;</button>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "transactions": [
+    {
+      "id": "income_1_20250617",
+      "date": "2025-06-17",
+      "amount": 10.0,
+      "category": "Salary",
+      "description": "ok",
+      "transaction_type": "income"
+    }
+  ],
+  "budgets": []
+}
